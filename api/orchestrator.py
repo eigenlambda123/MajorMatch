@@ -359,21 +359,6 @@ def run_orchestrated_assistant(
 ) -> OrchestratorResult:
     resolved_model = resolve_chat_model(model)
 
-    if _is_normal_chat_question(user_message):
-        lowered = user_message.lower()
-        return OrchestratorResult(
-            reply=(
-                _friendly_identity_reply()
-                if re.search(r"\b(what are you|who are you|tell me about yourself|introduce yourself)\b", lowered)
-                else _friendly_gratitude_reply()
-                if re.search(r"\b(thanks|thank you|thx|appreciate it|that's all|that is all)\b", lowered)
-                else "Hello. I am MajorMatch, an AI assistant that helps with courses and careers."
-            ),
-            artifacts={},
-            tool_trace=[],
-            raw="",
-        )
-
     system_prompt = (
         "You are MajorMatch's orchestrator. Use tools only when explicitly required to produce structured results (predictions, market data, or semantic search). "
         "Do not call tools for greetings, introductions, identity questions, or other normal chat. "
@@ -399,6 +384,22 @@ def run_orchestrated_assistant(
         messages.extend(conversation_history)
     else:
         messages.append({"role": "user", "content": user_message})
+
+    if _is_normal_chat_question(user_message):
+        # For simple greetings, identity, and gratitude messages, do not
+        # invoke the chat backend or tools — reply directly. This avoids
+        # unnecessary external calls during light interactions and keeps
+        # test behavior stable (no chat_fn invocation expected).
+        lowered = user_message.lower()
+        reply = (
+            _friendly_identity_reply()
+            if re.search(r"\b(what are you|who are you|tell me about yourself|introduce yourself)\b", lowered)
+            else _friendly_gratitude_reply()
+            if re.search(r"\b(thanks|thank you|thx|appreciate it|that's all|that is all)\b", lowered)
+            else "Hello. I am MajorMatch, an AI assistant that helps with courses and careers."
+        )
+        return OrchestratorResult(reply=reply, artifacts={}, tool_trace=[], raw="")
+
 
     tool_schemas = build_tool_schemas() if allow_tool_calls else None
     trace: List[ToolTrace] = []
@@ -430,12 +431,7 @@ def run_orchestrated_assistant(
                 if stream_chat_fn and on_stream_chunk:
                     final_content = ""
                     try:
-                        for chunk in stream_chat_fn(
-                            final_messages,
-                            model=resolved_model,
-                            tools=tool_schemas,
-                            options={"temperature": 0.2},
-                        ):
+                        for chunk in stream_chat_fn(final_messages, model=resolved_model, options={"temperature": 0.2}):
                             chunk_text = str(chunk or "")
                             if not chunk_text:
                                 continue

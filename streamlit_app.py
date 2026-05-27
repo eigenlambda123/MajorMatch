@@ -326,14 +326,12 @@ def _render_tool_output(result: OrchestratorResult):
 def main():
     st.set_page_config(page_title="MajorMatch", layout="wide")
     st.title("MajorMatch")
-    st.caption("A semantic course and career pathfinder for students, advisors, and freshmen.")
 
     ollama_ready = ollama_is_available()
     resolved_model = resolve_chat_model()
     _render_hero_section(ollama_ready, resolved_model)
 
     st.subheader("Chat Assistant")
-    st.caption("Ask naturally. Normal questions get a direct friendly reply; tools are used only when needed.")
 
     allow_tools = st.checkbox(
         "Allow assistant to call tools (recommendations, market data, search)",
