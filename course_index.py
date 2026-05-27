@@ -92,22 +92,6 @@ def ensure_database() -> None:
     Base.metadata.create_all(engine)
 
 
-def server_supports_vector() -> bool:
-    """Return True if the connected Postgres server has the `vector` extension installed."""
-    engine = get_engine()
-    try:
-        with engine.begin() as conn:
-            result = conn.exec_driver_sql("SELECT extname FROM pg_extension WHERE extname='vector'")
-            rows = result.fetchall()
-            return len(rows) > 0
-    except Exception:
-        return False
-
-
-def get_embedding_model_name() -> str:
-    """Return the embedding model name configured for the service."""
-    return EMBEDDING_MODEL_NAME
-
 
 def load_course_corpus(csv_path: Path | str = DEFAULT_COURSE_CSV) -> List[Dict[str, str]]:
     path = Path(csv_path)
