@@ -335,6 +335,12 @@ def main():
     st.subheader("Chat Assistant")
     st.caption("Ask naturally. Normal questions get a direct friendly reply; tools are used only when needed.")
 
+    allow_tools = st.checkbox(
+        "Allow assistant to call tools (recommendations, market data, search)",
+        value=True,
+        help="When off, the assistant will reply without invoking prediction, career-context, or semantic-search tools.",
+    )
+
     if "assistant_messages" not in st.session_state:
         st.session_state["assistant_messages"] = [
             {
@@ -365,7 +371,7 @@ def main():
         st.session_state["assistant_latest_tool_name"] = ""
         st.session_state["prediction_tool_open"] = False
 
-        if should_open_prediction_tool(user_message):
+        if should_open_prediction_tool(user_message) and allow_tools:
             st.session_state["prediction_tool_open"] = True
             st.session_state["assistant_messages"].append(
                 {
@@ -394,6 +400,7 @@ def main():
                 user_message,
                 location="United States",
                 model=resolved_model,
+                allow_tool_calls=allow_tools,
                 conversation_history=st.session_state["assistant_messages"],
                 stream_chat_fn=chat_completion_stream,
                 on_stream_chunk=_on_chunk,

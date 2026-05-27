@@ -243,6 +243,10 @@ def _try_extract_tool_call_from_content(message: Dict[str, Any]) -> List[Dict[st
             continue
         # arguments may be under 'parameters' or 'arguments'
         arguments = item.get("parameters") or item.get("arguments") or {}
+        # If parameters were returned as a list (common pattern: [ { ... } ]),
+        # unwrap the first dict so _parse_tool_arguments can normalize it.
+        if isinstance(arguments, list) and arguments and isinstance(arguments[0], dict):
+            arguments = arguments[0]
         calls.append({"id": None, "type": "function", "name": name, "arguments": _parse_tool_arguments(arguments)})
     return calls
 
@@ -345,6 +349,7 @@ def run_orchestrated_assistant(
     *,
     location: str = "United States",
     model: Optional[str] = None,
+    allow_tool_calls: bool = True,
     conversation_history: Optional[List[Dict[str, str]]] = None,
     max_steps: int = 4,
     chat_fn: Callable[..., Dict[str, Any]] = chat_completion,
@@ -370,7 +375,7 @@ def run_orchestrated_assistant(
         )
 
     system_prompt = (
-        "You are MajorMatch's orchestrator. Use tools automatically whenever they are relevant. "
+        "You are MajorMatch's orchestrator. Use tools only when explicitly required to produce structured results (predictions, market data, or semantic search). "
         "Do not call tools for greetings, introductions, identity questions, or other normal chat. "
         "Do not call tools for gratitude, acknowledgements, or wrap-up messages. "
         "If the user asks what you are or says hello, answer directly with a friendly plain-language introduction. "
@@ -395,7 +400,7 @@ def run_orchestrated_assistant(
     else:
         messages.append({"role": "user", "content": user_message})
 
-    tool_schemas = build_tool_schemas()
+    tool_schemas = build_tool_schemas() if allow_tool_calls else None
     trace: List[ToolTrace] = []
     artifacts: Dict[str, Any] = {}
     last_content = ""
@@ -428,6 +433,7 @@ def run_orchestrated_assistant(
                         for chunk in stream_chat_fn(
                             final_messages,
                             model=resolved_model,
+                            tools=tool_schemas,
                             options={"temperature": 0.2},
                         ):
                             chunk_text = str(chunk or "")
@@ -450,6 +456,7 @@ def run_orchestrated_assistant(
                 final_response = chat_fn(
                     final_messages,
                     model=resolved_model,
+                    tools=tool_schemas,
                     options={"temperature": 0.2},
                 )
                 final_message = final_response.get("message", {}) if isinstance(final_response, dict) else {}
