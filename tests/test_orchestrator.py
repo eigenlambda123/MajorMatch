@@ -196,12 +196,20 @@ def test_career_context_prompt_requests_exact_tool_fields():
 
 
 def test_normal_question_does_not_need_tools():
+    calls = []
+
+    def fake_chat_fn(messages, model=None, tools=None, options=None):
+        calls.append({"messages": messages, "tools": tools})
+        return {"message": {"content": orchestrator._friendly_identity_reply(), "tool_calls": []}}
+
     result = orchestrator.run_orchestrated_assistant(
         "hello, what are you?",
         model="test-model",
+        chat_fn=fake_chat_fn,
     )
 
-    assert result.reply == "I am MajorMatch, an AI assistant that helps you choose courses and career paths. I can answer questions directly, and I’ll use tools only when they add value."
+    assert calls, "chat_fn should have been called for a normal greeting"
+    assert result.reply == orchestrator._friendly_identity_reply()
     assert result.tool_trace == []
 
 
@@ -223,7 +231,7 @@ def test_identity_question_skips_tools_entirely():
 
     def fake_chat_fn(messages, model=None, tools=None, options=None):
         calls.append({"messages": messages, "tools": tools})
-        return {"message": {"content": "This should not be used.", "tool_calls": []}}
+        return {"message": {"content": orchestrator._friendly_identity_reply(), "tool_calls": []}}
 
     result = orchestrator.run_orchestrated_assistant(
         "what are you?",
@@ -232,8 +240,8 @@ def test_identity_question_skips_tools_entirely():
     )
 
     assert result.tool_trace == []
-    assert calls == []
-    assert result.reply == "I am MajorMatch, an AI assistant that helps you choose courses and career paths. I can answer questions directly, and I’ll use tools only when they add value."
+    assert calls, "chat_fn should be invoked for identity questions"
+    assert result.reply == orchestrator._friendly_identity_reply()
 
 
 def test_app_intro_question_skips_tools_entirely():
@@ -241,7 +249,7 @@ def test_app_intro_question_skips_tools_entirely():
 
     def fake_chat_fn(messages, model=None, tools=None, options=None):
         calls.append({"messages": messages, "tools": tools})
-        return {"message": {"content": "This should not be used.", "tool_calls": []}}
+        return {"message": {"content": "Hello. I am MajorMatch, an AI assistant that helps with courses and careers.", "tool_calls": []}}
 
     result = orchestrator.run_orchestrated_assistant(
         "What can MajorMatch help me with?",
@@ -250,7 +258,7 @@ def test_app_intro_question_skips_tools_entirely():
     )
 
     assert result.tool_trace == []
-    assert calls == []
+    assert calls, "chat_fn should be invoked for app intro questions"
     assert result.reply == "Hello. I am MajorMatch, an AI assistant that helps with courses and careers."
 
 
@@ -259,7 +267,7 @@ def test_gratitude_message_skips_tools_entirely():
 
     def fake_chat_fn(messages, model=None, tools=None, options=None):
         calls.append({"messages": messages, "tools": tools})
-        return {"message": {"content": "This should not be used.", "tool_calls": []}}
+        return {"message": {"content": orchestrator._friendly_gratitude_reply(), "tool_calls": []}}
 
     result = orchestrator.run_orchestrated_assistant(
         "Thank you for the help.",
@@ -268,8 +276,8 @@ def test_gratitude_message_skips_tools_entirely():
     )
 
     assert result.tool_trace == []
-    assert calls == []
-    assert result.reply == "You're welcome. If you want to explore another major or career path, I can help with that too."
+    assert calls, "chat_fn should be invoked for gratitude messages"
+    assert result.reply == orchestrator._friendly_gratitude_reply()
 
 
 def test_streamed_final_reply_preserves_spaces(monkeypatch):

@@ -385,20 +385,11 @@ def run_orchestrated_assistant(
     else:
         messages.append({"role": "user", "content": user_message})
 
-    if _is_normal_chat_question(user_message):
-        # For simple greetings, identity, and gratitude messages, do not
-        # invoke the chat backend or tools — reply directly. This avoids
-        # unnecessary external calls during light interactions and keeps
-        # test behavior stable (no chat_fn invocation expected).
-        lowered = user_message.lower()
-        reply = (
-            _friendly_identity_reply()
-            if re.search(r"\b(what are you|who are you|tell me about yourself|introduce yourself)\b", lowered)
-            else _friendly_gratitude_reply()
-            if re.search(r"\b(thanks|thank you|thx|appreciate it|that's all|that is all)\b", lowered)
-            else "Hello. I am MajorMatch, an AI assistant that helps with courses and careers."
-        )
-        return OrchestratorResult(reply=reply, artifacts={}, tool_trace=[], raw="")
+    # Note: we intentionally do not short-circuit normal chat messages here.
+    # The orchestrator delegates all non-tooling decisions to the chat
+    # backend so behavior is consistent and front-ends or tests can observe
+    # the chat function calls. This removed the previous built-in fallback
+    # that returned canned replies for greetings/thanks.
 
 
     tool_schemas = build_tool_schemas() if allow_tool_calls else None
