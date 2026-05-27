@@ -398,6 +398,25 @@ def run_orchestrated_assistant(
     last_content = ""
     raw = ""
 
+    # If tool calls are disabled and a streaming chat function is provided,
+    # prefer streaming the assistant's reply directly to the caller via the
+    # `on_stream_chunk` callback. This enables responsive UIs even when the
+    # model is only used for normal chat (no tools).
+    if not allow_tool_calls and stream_chat_fn and on_stream_chunk:
+        final_content = ""
+        try:
+            for chunk in stream_chat_fn(messages, model=resolved_model, options={"temperature": 0.2}):
+                chunk_text = str(chunk or "")
+                if not chunk_text:
+                    continue
+                on_stream_chunk(chunk_text)
+                final_content += chunk_text
+            if final_content:
+                return OrchestratorResult(reply=final_content, artifacts={}, tool_trace=[], raw="<streamed>")
+        except Exception:
+            # If streaming fails, fall back to synchronous chat below.
+            pass
+
     for _ in range(max_steps):
         response = chat_fn(messages, model=resolved_model, tools=tool_schemas, options={"temperature": 0.2})
         raw = json.dumps(response)
