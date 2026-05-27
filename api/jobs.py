@@ -42,6 +42,7 @@ ADZUNA_CURRENCY = os.getenv("ADZUNA_CURRENCY", "USD")
 
 @dataclass(frozen=True)
 class CareerContext:
+    """Structured career context data for a given track and location."""
     track: str
     location: str
     source: str
@@ -73,6 +74,7 @@ class CareerContext:
 
 
 def build_job_query(track: str) -> str:
+    """Normalize the input track string and build a search query for the jobs API."""
     normalized = (track or "").strip().lower()
 
     if any(keyword in normalized for keyword in ("software", "computer", "information technology", "engineering", "electronics", "electrical", "mechanical", "civil", "bca", "cs")):
@@ -151,6 +153,7 @@ def _extract_companies(results: List[Dict[str, Any]], limit: int = 3) -> List[st
 
 
 def get_career_context(track: str, location: str = "United States", results_per_page: int = 10) -> CareerContext:
+    """Fetch career context for a given track and location using the Adzuna API."""
     if not track.strip():
         return CareerContext(
             track=track,

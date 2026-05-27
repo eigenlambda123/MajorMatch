@@ -34,7 +34,7 @@ def recommend_track(features: dict | Sequence[str]) -> Dict[str, object]:
     return {"track": track, "confidence": confidence}
 
 
-def suggest_career_context(track: str, location: str = "United States"):
+def suggest_career_context(track: str, location: str = "Philippines") -> List[Dict[str, str]]:
     return get_career_context(track, location=location)
 
 
