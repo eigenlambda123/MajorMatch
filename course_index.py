@@ -169,6 +169,7 @@ def _projection_matrix(embeddings: np.ndarray, method: str) -> np.ndarray:
 
 
 def rebuild_course_index(csv_path: Path | str = DEFAULT_COURSE_CSV) -> int:
+    """Rebuild the course index from the specified CSV file or directory. Returns the number of courses indexed."""
     ensure_database()
     rows = load_course_corpus(csv_path)
     if not rows:
@@ -261,6 +262,7 @@ def _get_projection_columns(method: str):
 
 
 def search_courses(query: str, top_k: int = 5) -> List[Dict[str, str]]:
+    """Search courses based on the query string. If the query is empty, return a list of courses without scores."""
     if not query.strip():
         return list_courses(limit=top_k)
 
@@ -270,6 +272,8 @@ def search_courses(query: str, top_k: int = 5) -> List[Dict[str, str]]:
 
 
 def list_courses(limit: Optional[int] = None) -> List[Dict[str, str]]:
+    """List courses from the database, optionally limited to a certain number of entries. This is used when the query is empty to return courses without scores.
+    """
     ensure_database()
     session_factory = get_session_factory()
     with session_factory() as session:
@@ -281,6 +285,7 @@ def list_courses(limit: Optional[int] = None) -> List[Dict[str, str]]:
 
 
 def get_projection_points(method: str = "pca") -> List[CoursePoint]:
+    """Get course projection points for the specified method (pca, umap, tsne)."""
     ensure_database()
     x_col, y_col = _get_projection_columns(method)
     session_factory = get_session_factory()

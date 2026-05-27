@@ -17,6 +17,7 @@ def load_courses(path: str = "data/courses.csv") -> List[Dict]:
 
 
 def semantic_search(query: str, courses: List[Dict] | None = None, top_k: int = 5) -> List[Dict]:
+    """Perform a semantic search over the course corpus."""
     # Normalize inputs
     try:
         q = "" if query is None else str(query)
@@ -56,9 +57,11 @@ def semantic_search(query: str, courses: List[Dict] | None = None, top_k: int = 
 
 
 def get_course_projection_points(method: str = "pca"):
+    """Get course projection points for the specified method (pca, umap, tsne)."""
     return get_projection_points(method)
 
 
 def rebuild_index(path: str = "data/courses.csv") -> int:
+    """Rebuild the course index from the specified CSV file."""
     return rebuild_course_index(Path(path))
 
