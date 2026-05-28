@@ -280,6 +280,54 @@ def test_gratitude_message_skips_tools_entirely():
     assert result.reply == orchestrator._friendly_gratitude_reply()
 
 
+def test_explicit_semantic_search_request_forces_tool_execution(monkeypatch):
+    monkeypatch.setattr(
+        orchestrator,
+        "search_courses_with_projection",
+        lambda query, top_k=5, method="pca": (
+            [
+                {
+                    "id": 1,
+                    "title": "Audio Electronics Fundamentals",
+                    "description": "Circuits and signal flow for musical gear",
+                    "score": 0.91,
+                    "score_normalized": 0.955,
+                    "source": "db",
+                }
+            ],
+            {
+                "available": True,
+                "method": method,
+                "courses": [],
+                "query_point": {"id": -1, "title": "(query)", "description": query, "x": 0.0, "y": 0.0},
+                "methods": {},
+            },
+        ),
+    )
+
+    calls = []
+
+    def fake_chat_fn(messages, model=None, tools=None, options=None):
+        calls.append({"messages": messages, "tools": tools})
+        return {
+            "message": {
+                "content": "Based on what is in my database using the semantic search tool, the results are: Audio Electronics Fundamentals. The visualization is shown below.",
+                "tool_calls": [],
+            }
+        }
+
+    result = orchestrator.run_orchestrated_assistant(
+        "Give me a visualization using the semantic search tool for electronics and guitar amp design.",
+        model="test-model",
+        chat_fn=fake_chat_fn,
+    )
+
+    assert result.tool_trace
+    assert result.tool_trace[0].name == "execute_semantic_search"
+    assert result.artifacts["semantic_search"]["results"][0]["title"] == "Audio Electronics Fundamentals"
+    assert calls, "chat_fn should still be called to produce the final user-facing message"
+
+
 def test_streamed_final_reply_preserves_spaces(monkeypatch):
     monkeypatch.setattr(
         orchestrator,

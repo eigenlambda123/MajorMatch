@@ -67,6 +67,49 @@ def _friendly_gratitude_reply() -> str:
     return "You're welcome. If you want to explore another major or career path, I can help with that too."
 
 
+def _should_force_semantic_search(user_message: str) -> bool:
+    lowered = (user_message or "").strip().lower()
+    if not lowered:
+        return False
+
+    # Explicit requests to use semantic search should deterministically trigger the tool.
+    if any(
+        phrase in lowered
+        for phrase in (
+            "semantic search",
+            "execute_semantic_search",
+            "semantic search tool",
+            "use semantic search",
+        )
+    ):
+        return True
+
+    # Also trigger for clear map/visualization requests in a course/major context.
+    asks_for_visual = any(
+        keyword in lowered
+        for keyword in (
+            "visualization",
+            "visualize",
+            "plot",
+            "projection",
+            "map",
+        )
+    )
+    asks_about_learning_options = any(
+        keyword in lowered
+        for keyword in (
+            "course",
+            "courses",
+            "major",
+            "program",
+            "learning",
+            "class",
+            "classes",
+        )
+    )
+    return asks_for_visual and asks_about_learning_options
+
+
 @dataclass(frozen=True)
 class ToolTrace:
     name: str
@@ -281,7 +324,7 @@ def _execute_tool(name: str, arguments: Dict[str, Any], location: str) -> Dict[s
         return context.to_dict()
 
     if name == "execute_semantic_search":
-        query = str(arguments.get("user_query") or "").strip()
+        query = str(arguments.get("user_query") or arguments.get("query") or "").strip()
         top_k = max(1, min(int(arguments.get("top_k") or 5), 5))
         projection_method = str(arguments.get("projection_method") or "pca").strip().lower() or "pca"
         if projection_method == "tnse":
@@ -390,6 +433,63 @@ def run_orchestrated_assistant(
     # backend so behavior is consistent and front-ends or tests can observe
     # the chat function calls. This removed the previous built-in fallback
     # that returned canned replies for greetings/thanks.
+
+
+    if allow_tool_calls and _should_force_semantic_search(user_message):
+        semantic_result = _execute_tool(
+            "execute_semantic_search",
+            {"user_query": user_message, "top_k": 5, "projection_method": "pca"},
+            location,
+        )
+        semantic_trace = ToolTrace(
+            name="execute_semantic_search",
+            arguments={"user_query": user_message, "top_k": 5, "projection_method": "pca"},
+            result=semantic_result,
+        )
+        artifacts = {"semantic_search": semantic_result}
+        trace = [semantic_trace]
+
+        final_messages = [
+            *messages,
+            {
+                "role": "system",
+                "content": _build_final_response_prompt(trace, artifacts),
+            },
+        ]
+
+        if stream_chat_fn and on_stream_chunk:
+            final_content = ""
+            try:
+                for chunk in stream_chat_fn(final_messages, model=resolved_model, options={"temperature": 0.2}):
+                    chunk_text = str(chunk or "")
+                    if not chunk_text:
+                        continue
+                    on_stream_chunk(chunk_text)
+                    final_content += chunk_text
+                if final_content:
+                    return OrchestratorResult(
+                        reply=final_content,
+                        artifacts=artifacts,
+                        tool_trace=trace,
+                        raw="<streamed>",
+                    )
+            except Exception:
+                pass
+
+        final_response = chat_fn(
+            final_messages,
+            model=resolved_model,
+            tools=build_tool_schemas() if allow_tool_calls else None,
+            options={"temperature": 0.2},
+        )
+        final_message = final_response.get("message", {}) if isinstance(final_response, dict) else {}
+        final_content = _clean_assistant_text(str(final_message.get("content", "") or ""))
+        return OrchestratorResult(
+            reply=final_content or "I could not generate a response.",
+            artifacts=artifacts,
+            tool_trace=trace,
+            raw=json.dumps(final_response) if isinstance(final_response, dict) else "",
+        )
 
 
     tool_schemas = build_tool_schemas() if allow_tool_calls else None
